@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: fullName, cnic, phoneNumber, email, password, isVerified, createdAt
+    //
+    // Collection: wallets
+    // Fields: uid, balance, currencies
+    //
+    // Sub-collection: transactions
+    // Fields: title, amount, type, category, timestamp, status
+    //
+    // ===============================================================
+
+    // --- Helper Functions ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "su92-bscsm-f23-626@superior.edu.pk" && request.auth.token.email_verified == true));
+    }
+
+    // --- Validation Functions ---
+    function isValidUser(data) {
+      return data.keys().hasAll(['fullName', 'cnic', 'phoneNumber', 'email']) &&
+             data.fullName is string && data.fullName.size() > 0 &&
+             data.cnic is string && data.cnic.matches("^\\d{13}$") &&
+             data.phoneNumber is string &&
+             data.email is string;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['amount', 'type', 'title', 'timestamp']) &&
+             data.amount is number &&
+             data.type in ['credit', 'debit'] &&
+             data.title is string && data.title.size() < 100;
+    }
+
+    // --- Rules ---
+    match /{path=**} {
+      allow read, write: if true;
+    }
+  }
+}

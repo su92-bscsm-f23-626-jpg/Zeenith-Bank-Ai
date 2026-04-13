@@ -1,0 +1,5 @@
+{
+  "name": "Zenith Bank AI",
+  "description": "Smart Banking Powered by Artificial Intelligence with a Lush Forest theme.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"]
+}
