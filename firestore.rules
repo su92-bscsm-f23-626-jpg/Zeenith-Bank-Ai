@@ -7,23 +7,49 @@ service cloud.firestore {
     // ===============================================================
     //
     // Collection: users
-    // Fields: fullName, cnic, phoneNumber, email, password, isVerified, createdAt
+    // Document ID: email
+    // Fields:
+    //   - fullName: string (required)
+    //   - email: string (required)
+    //   - cnic: string
+    //   - dob: string
+    //   - gender: string
+    //   - phoneNumber: string
+    //   - password: string (hashed, required)
+    //   - isVerified: bool
+    //   - createdAt: timestamp
     //
     // Collection: wallets
-    // Fields: uid, balance, currencies
+    // Document ID: email
+    // Fields:
+    //   - balance: number (required)
+    //   - currencies: map
+    //   - isLinked: bool
+    //   - accountNumber: string
+    //   - name: string
     //
-    // Sub-collection: transactions
-    // Fields: title, amount, type, category, timestamp, status
+    // Sub-collection: users/{email}/transactions
+    // Fields:
+    //   - title: string (required)
+    //   - amount: number (required)
+    //   - type: string (credit/debit, required)
+    //   - category: string
+    //   - timestamp: timestamp (required)
+    //   - note: string
+    //   - status: string
     //
     // ===============================================================
 
-    // --- Helper Functions ---
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+    function isOwner(email) {
+      return isAuthenticated() && request.auth.token.email == email;
     }
 
     function isAdmin() {
@@ -32,25 +58,70 @@ service cloud.firestore {
           (request.auth.token.email == "su92-bscsm-f23-626@superior.edu.pk" && request.auth.token.email_verified == true));
     }
 
-    // --- Validation Functions ---
     function isValidUser(data) {
-      return data.keys().hasAll(['fullName', 'cnic', 'phoneNumber', 'email']) &&
-             data.fullName is string && data.fullName.size() > 0 &&
-             data.cnic is string && data.cnic.matches("^\\d{13}$") &&
-             data.phoneNumber is string &&
-             data.email is string;
+      return data.keys().hasAll(['fullName', 'email', 'password']) &&
+             data.fullName is string && data.fullName.size() > 0 && data.fullName.size() < 100 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.password is string && data.password.size() > 0;
+    }
+
+    function isValidWallet(data) {
+      return data.keys().hasAll(['balance']) &&
+             data.balance is number;
     }
 
     function isValidTransaction(data) {
-      return data.keys().hasAll(['amount', 'type', 'title', 'timestamp']) &&
+      return data.keys().hasAll(['title', 'amount', 'type', 'timestamp']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
              data.amount is number &&
              data.type in ['credit', 'debit'] &&
-             data.title is string && data.title.size() < 100;
+             data.timestamp is timestamp;
     }
 
-    // --- Rules ---
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{email} {
+      allow read: if isOwner(email) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(email) || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(email) || isAdmin());
+      
+      match /transactions/{txId} {
+        allow read: if isOwner(email) || isAdmin();
+        allow create: if isOwner(email) && isValidTransaction(request.resource.data);
+      }
+
+      match /securityLogs/{logId} {
+        allow read: if isOwner(email) || isAdmin();
+        allow create: if isOwner(email);
+      }
+
+      match /bills/{billId} {
+        allow read: if isOwner(email) || isAdmin();
+        allow create: if isOwner(email);
+      }
+
+      match /wallets/{walletId} {
+        allow read: if isOwner(email) || isAdmin();
+        allow create: if isOwner(email) && isValidWallet(request.resource.data);
+      }
+      
+      match /cards/{cardId} {
+        allow read: if isOwner(email) || isAdmin();
+        allow write: if isOwner(email);
+      }
+    }
+
+    match /wallets/{email} {
+      allow read: if isOwner(email) || isAdmin();
+      allow create: if isAuthenticated() && isValidWallet(request.resource.data) && (isOwner(email) || isAdmin());
+      allow update: if isAuthenticated() && isValidWallet(request.resource.data) && (isOwner(email) || isAdmin());
+    }
+
+    // Default deny
     match /{path=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

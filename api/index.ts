@@ -10,19 +10,25 @@ import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { GoogleGenAI } from "@google/genai";
 import Stripe from "stripe";
 import path from "path";
-import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import crypto from "crypto";
 import fs from "fs";
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 // --- Firebase Admin Initialization ---
-const configPath = path.join(__dirname, "firebase-applet-config.json");
-const firebaseAppletConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+let firebaseAppletConfig;
+try {
+  firebaseAppletConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+} catch (e) {
+  console.error("Failed to load firebase-applet-config.json", e);
+  // Fallback to env vars if needed, but for now we expect the file
+  firebaseAppletConfig = {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    firestoreDatabaseId: process.env.FIREBASE_DATABASE_ID
+  };
+}
 
 if (!getApps().length) {
   initializeApp({
@@ -37,11 +43,14 @@ const JWT_SECRET = process.env.JWT_SECRET || "zenith-bank-ai-secret-key-2026";
 const geminiApiKey = process.env.GEMINI_API_KEY;
 
 const app = express();
-const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", message: "Zenith Bank AI API is running on Vercel" });
+});
 
 // --- Middleware: Auth ---
 const authenticateToken = (req: any, res: Response, next: NextFunction) => {
@@ -427,7 +436,7 @@ app.post("/api/payments/stripe/create-intent", authenticateToken, async (req: an
 
   try {
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
+      amount: Math.round(amount * 100), // Stripe expects amount in cents/paisas
       currency: currency.toLowerCase(),
       metadata: { user_email: req.user.email },
     });
@@ -444,7 +453,7 @@ app.post("/api/payments/stripe/confirm", authenticateToken, async (req: any, res
 
   try {
     const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    if (intent.status === "succeeded" || intent.id.startsWith('pi_demo_')) {
+    if (intent.status === "succeeded" || paymentIntentId.startsWith('pi_demo_')) {
       // Update balance
       await db.collection("wallets").doc(email).update({ balance: FieldValue.increment(amount) });
       
@@ -467,22 +476,4 @@ app.post("/api/payments/stripe/confirm", authenticateToken, async (req: any, res
   }
 });
 
-// --- VITE MIDDLEWARE ---
-if (process.env.NODE_ENV === "production") {
-  const distPath = path.join(process.cwd(), "dist");
-  app.use(express.static(distPath));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
-  });
-} else {
-  const { createServer: createViteServer } = await import("vite");
-  const vite = await createViteServer({
-    server: { middlewareMode: true },
-    appType: "spa",
-  });
-  app.use(vite.middlewares);
-}
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Zenith Bank AI Backend running on http://localhost:${PORT}`);
-});
+export default app;

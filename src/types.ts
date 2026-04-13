@@ -23,7 +23,12 @@ export type Screen =
   | 'search'
   | 'voice_banking'
   | 'offers'
-  | 'loans';
+  | 'loans'
+  | 'prayer_times'
+  | 'qibla'
+  | 'quran'
+  | 'sadaqah'
+  | 'halal_invest';
 
 export interface SavingJar {
   id: string;

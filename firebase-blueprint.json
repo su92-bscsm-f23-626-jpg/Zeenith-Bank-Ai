@@ -2,198 +2,98 @@
   "entities": {
     "User": {
       "title": "User",
-      "description": "User profile with Pakistani-specific fields.",
+      "description": "User profile information",
       "type": "object",
       "properties": {
-        "fullName": { "type": "string", "description": "Full name of the user." },
-        "cnic": { "type": "string", "description": "Pakistani CNIC number (13 digits)." },
-        "dob": { "type": "string", "format": "date", "description": "Date of birth." },
-        "gender": { "type": "string", "enum": ["Male", "Female", "Other"], "description": "Gender of the user." },
-        "phoneNumber": { "type": "string", "description": "Mobile number." },
-        "email": { "type": "string", "format": "email", "description": "Email address." },
-        "password": { "type": "string", "description": "Hashed password." },
-        "otp": { "type": "string", "description": "Current OTP for verification." },
-        "otpExpiry": { "type": "string", "format": "date-time", "description": "OTP expiration timestamp." },
-        "isVerified": { "type": "boolean", "description": "Whether the phone/email is verified." },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "fullName": { "type": "string" },
+        "cnic": { "type": "string" },
+        "dob": { "type": "string" },
+        "gender": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "email": { "type": "string" },
+        "password": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "createdAt": { "type": "object" }
       },
-      "required": ["fullName", "cnic", "phoneNumber", "email", "password"]
+      "required": ["fullName", "email", "password"]
     },
     "Wallet": {
       "title": "Wallet",
-      "description": "User's primary and multi-currency balances.",
+      "description": "User wallet balance",
       "type": "object",
       "properties": {
-        "uid": { "type": "string", "description": "Owner's user ID." },
-        "balance": { "type": "number", "description": "Primary balance in PKR." },
-        "currencies": {
-          "type": "object",
-          "description": "Balances in other currencies (USD, EUR, etc.)"
-        }
+        "balance": { "type": "number" },
+        "currencies": { "type": "object" },
+        "isLinked": { "type": "boolean" },
+        "accountNumber": { "type": "string" },
+        "name": { "type": "string" }
       },
-      "required": ["uid", "balance"]
+      "required": ["balance"]
     },
     "Transaction": {
       "title": "Transaction",
-      "description": "Record of money movement.",
+      "description": "Financial transaction record",
       "type": "object",
       "properties": {
-        "senderId": { "type": "string" },
-        "receiverId": { "type": "string" },
+        "title": { "type": "string" },
         "amount": { "type": "number" },
         "type": { "type": "string", "enum": ["credit", "debit"] },
         "category": { "type": "string" },
-        "title": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["success", "failed", "pending"] }
+        "timestamp": { "type": "object" },
+        "note": { "type": "string" },
+        "status": { "type": "string" }
       },
-      "required": ["amount", "type", "title", "timestamp"]
+      "required": ["title", "amount", "type", "timestamp"]
     },
-    "Card": {
-      "title": "Card",
-      "description": "Virtual or physical card details.",
+    "SecurityLog": {
+      "title": "Security Log",
+      "description": "Record of security events like login",
       "type": "object",
       "properties": {
-        "type": { "type": "string" },
-        "number": { "type": "string" },
-        "expiry": { "type": "string" },
-        "balance": { "type": "number" },
-        "color": { "type": "string" }
+        "timestamp": { "type": "object" },
+        "event": { "type": "string" },
+        "status": { "type": "string" },
+        "device": { "type": "string" }
       },
-      "required": ["type", "number", "expiry"]
-    },
-    "Subscription": {
-      "title": "Subscription",
-      "description": "Tracked recurring payments.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "price": { "type": "number" },
-        "category": { "type": "string" },
-        "usage": { "type": "string" }
-      },
-      "required": ["name", "price"]
+      "required": ["timestamp", "event", "status"]
     },
     "Bill": {
       "title": "Bill",
-      "description": "Utility bill records.",
+      "description": "Bill payment record",
       "type": "object",
       "properties": {
         "type": { "type": "string" },
         "amount": { "type": "number" },
-        "dueDate": { "type": "string" },
-        "status": { "type": "string", "enum": ["paid", "unpaid"] }
+        "status": { "type": "string" },
+        "timestamp": { "type": "object" }
       },
-      "required": ["type", "amount", "status"]
-    },
-    "SecurityLog": {
-      "title": "SecurityLog",
-      "description": "Login and security event history.",
-      "type": "object",
-      "properties": {
-        "timestamp": { "type": "string", "format": "date-time" },
-        "event": { "type": "string" },
-        "ip": { "type": "string" },
-        "device": { "type": "string" },
-        "status": { "type": "string" }
-      }
-    },
-    "Jar": {
-      "title": "Jar",
-      "description": "Saving jar for specific goals.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "targetAmount": { "type": "number" },
-        "currentAmount": { "type": "number" },
-        "deadline": { "type": "string" },
-        "category": { "type": "string" },
-        "color": { "type": "string" }
-      },
-      "required": ["name", "targetAmount", "currentAmount"]
-    },
-    "GroupWallet": {
-      "title": "GroupWallet",
-      "description": "Shared wallet for groups.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "balance": { "type": "number" },
-        "members": { "type": "array", "items": { "type": "string" } },
-        "color": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["name", "balance", "members"]
-    },
-    "Notification": {
-      "title": "Notification",
-      "description": "User notification.",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "message": { "type": "string" },
-        "type": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "read": { "type": "boolean" }
-      },
-      "required": ["title", "message", "timestamp"]
-    },
-    "Donation": {
-      "title": "Donation",
-      "description": "Record of a donation made.",
-      "type": "object",
-      "properties": {
-        "ngoName": { "type": "string" },
-        "amount": { "type": "number" },
-        "donatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["ngoName", "amount", "donatedAt"]
+      "required": ["type", "amount", "status", "timestamp"]
     }
   },
   "firestore": {
-    "/users/{userId}": {
+    "/users/{email}": {
       "schema": "User",
-      "description": "User profile documents."
+      "description": "User profiles"
     },
-    "/users/{userId}/wallets/{walletId}": {
+    "/wallets/{email}": {
       "schema": "Wallet",
-      "description": "User digital wallets."
+      "description": "User wallet balances"
     },
-    "/users/{userId}/transactions/{txId}": {
+    "/users/{email}/transactions/{txId}": {
       "schema": "Transaction",
-      "description": "User transaction history."
+      "description": "User transaction history"
     },
-    "/users/{userId}/cards/{cardId}": {
-      "schema": "Card",
-      "description": "User cards."
-    },
-    "/users/{userId}/subscriptions/{subId}": {
-      "schema": "Subscription",
-      "description": "User subscriptions."
-    },
-    "/users/{userId}/bills/{billId}": {
-      "schema": "Bill",
-      "description": "User bill history."
-    },
-    "/users/{userId}/securityLogs/{logId}": {
+    "/users/{email}/securityLogs/{logId}": {
       "schema": "SecurityLog",
-      "description": "User security logs."
+      "description": "User security logs"
     },
-    "/users/{userId}/jars/{jarId}": {
-      "schema": "Jar",
-      "description": "User saving jars."
+    "/users/{email}/bills/{billId}": {
+      "schema": "Bill",
+      "description": "User bill payments"
     },
-    "/users/{userId}/group_wallets/{groupId}": {
-      "schema": "GroupWallet",
-      "description": "User group wallets."
-    },
-    "/users/{userId}/notifications/{notifId}": {
-      "schema": "Notification",
-      "description": "User notifications."
-    },
-    "/users/{userId}/donations/{donId}": {
-      "schema": "Donation",
-      "description": "User donations."
+    "/users/{email}/wallets/{walletId}": {
+      "schema": "Wallet",
+      "description": "User linked wallets"
     }
   }
 }

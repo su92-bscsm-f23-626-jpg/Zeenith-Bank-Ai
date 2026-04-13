@@ -45,7 +45,9 @@ import {
   Unlock,
   Settings,
   Eye,
+  EyeOff,
   Shield,
+  ShieldCheck,
   HelpCircle,
   LogOut,
   Mic,
@@ -66,7 +68,11 @@ import {
   ExternalLink,
   Calendar,
   Mail,
-  Phone
+  Phone,
+  Heart,
+  Clock,
+  Compass,
+  Book
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen, Transaction, Subscription, CardData, Message, DigitalWallet, SavingJar, SplitRequest, NGO, InvestmentFund, GroupWallet, Notification, Loan } from './types';
@@ -141,9 +147,7 @@ const CURRENCIES = [
 
 const INITIAL_WALLETS: DigitalWallet[] = [
   { id: '1', name: 'JazzCash', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/0/0e/JazzCash_logo.png/220px-JazzCash_logo.png', balance: 12450, accountNumber: '0300****821', color: 'bg-[#FF0000]', isLinked: true },
-  { id: '2', name: 'EasyPaisa', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Easypaisa_Logo.png/220px-Easypaisa_Logo.png', balance: 8200, accountNumber: '0345****123', color: 'bg-[#00A651]', isLinked: true },
-  { id: '3', name: 'SadaPay', logo: 'https://sadapay.pk/wp-content/uploads/2022/06/sadapay-logo.png', balance: 45000, accountNumber: '0312****456', color: 'bg-[#FF6B6B]', isLinked: false },
-  { id: '4', name: 'JazzCash Business', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/0/0e/JazzCash_logo.png/220px-JazzCash_logo.png', balance: 250000, accountNumber: '0301****999', color: 'bg-[#FF0000]', isLinked: false },
+  { id: '2', name: 'Stripe', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Stripe_Logo%2C_revised_2016.svg/512px-Stripe_Logo%2C_revised_2016.svg.png', balance: 0, accountNumber: 'stripe_account', color: 'bg-[#635BFF]', isLinked: false },
 ];
 
 const INITIAL_JARS: SavingJar[] = [
@@ -509,6 +513,7 @@ export default function App() {
   const [signupTerms, setSignupTerms] = useState(false);
   const [otpValue, setOtpValue] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
+  const [inputAmount, setInputAmount] = useState('');
 
   // --- Effects ---
   useEffect(() => {
@@ -976,6 +981,92 @@ export default function App() {
       setSelectedTxForReceipt(newTx);
       setDialog(null);
       showToast(`Successfully sent Rs. ${amount} to ${recipient}`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${userPath}/transactions`);
+    }
+  };
+
+  const handleAddMoney = async (amount: number) => {
+    const newTx: Transaction = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: 'Top-up',
+      category: 'Deposit',
+      amount: amount,
+      date: 'Just Now',
+      type: 'credit',
+      icon: 'Plus'
+    };
+
+    if (!user) {
+      setTransactions(prev => [newTx, ...prev]);
+      if (cards.length > 0) {
+        setCards(prev => prev.map((c, i) => i === 0 ? { ...c, balance: c.balance + amount } : c));
+      }
+      setDialog(null);
+      showToast(`Successfully added Rs. ${amount} to your account`);
+      return;
+    }
+
+    const userPath = `users/${user.uid}`;
+    try {
+      const txData = {
+        ...newTx,
+        date: Timestamp.now()
+      };
+      await addDoc(collection(db, userPath, 'transactions'), txData);
+      
+      if (cards.length > 0) {
+        const mainCard = cards[0];
+        await updateDoc(doc(db, userPath, 'cards', mainCard.id), {
+          balance: mainCard.balance + amount
+        });
+      }
+
+      setDialog(null);
+      showToast(`Successfully added Rs. ${amount} to your account`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${userPath}/transactions`);
+    }
+  };
+
+  const handleWithdrawMoney = async (amount: number) => {
+    const newTx: Transaction = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: 'Withdrawal',
+      category: 'Withdraw',
+      amount: -amount,
+      date: 'Just Now',
+      type: 'debit',
+      icon: 'ArrowRight'
+    };
+
+    if (!user) {
+      setTransactions(prev => [newTx, ...prev]);
+      if (cards.length > 0) {
+        setCards(prev => prev.map((c, i) => i === 0 ? { ...c, balance: c.balance - amount } : c));
+      }
+      setDialog(null);
+      showToast(`Successfully withdrawn Rs. ${amount} from your account`);
+      return;
+    }
+
+    const userPath = `users/${user.uid}`;
+    try {
+      const txData = {
+        ...newTx,
+        date: Timestamp.now()
+      };
+      await addDoc(collection(db, userPath, 'transactions'), txData);
+      
+      if (cards.length > 0) {
+        const mainCard = cards[0];
+        await updateDoc(doc(db, userPath, 'cards', mainCard.id), {
+          balance: mainCard.balance - amount
+        });
+      }
+
+      setDialog(null);
+      showToast(`Successfully withdrawn Rs. ${amount} from your account`);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `${userPath}/transactions`);
     }
@@ -2568,84 +2659,132 @@ export default function App() {
         <div className="px-6 mt-4">
           <div 
             onClick={() => navigateTo('transactions')}
-            className="glass-card p-8 lush-gradient relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all"
+            className="glass-card p-8 premium-gradient relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all"
           >
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-light-green/10 rounded-full blur-3xl group-hover:bg-light-green/20 transition-all duration-700" />
-            <div className="flex justify-between items-center">
-              <p className="text-soft-mint/60 text-sm font-medium">Total Portfolio Value</p>
-              <button 
-                onClick={(e) => { e.stopPropagation(); setShowBalance(!showBalance); }} 
-                className="text-soft-mint/40 hover:text-soft-mint transition-colors p-2"
-              >
-                {showBalance ? <ArrowRight size={16} className="rotate-90" /> : <ArrowRight size={16} />}
-              </button>
-            </div>
-            <h1 className="text-4xl font-bold mt-2 tracking-tight text-soft-mint">
-              {showBalance ? `Rs. ${totalBalance.toLocaleString()}` : '••••••••'}
-            </h1>
-            <div className="mt-4 flex items-center gap-2 text-light-green text-sm font-bold">
-              <div className="bg-light-green/20 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                <ArrowUpRight size={14} />
-                <span>+12.4%</span>
-              </div>
-              <span className="text-soft-mint/40 font-normal">vs last month</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Pay Widget */}
-        <div className="px-6 mt-6">
-          <div className="glass-card p-4 bg-white/5 border-white/10">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-widest">Quick Pay</h3>
-              <button className="text-[10px] font-bold text-light-green uppercase">Edit</button>
-            </div>
-            <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-2">
-              <button 
-                onClick={() => navigateTo('transfer')}
-                className="flex flex-col items-center gap-2 min-w-[64px]"
-              >
-                <div className="w-14 h-14 bg-forest-green/20 rounded-2xl border border-dashed border-forest-green/40 flex items-center justify-center text-light-green">
-                  <Plus size={24} />
-                </div>
-                <span className="text-[10px] font-bold text-soft-mint/60">New</span>
-              </button>
-              {['Sarah', 'Ahmed', 'Zain', 'Fatima'].map((name, i) => (
-                <button 
-                  key={i}
-                  onClick={() => navigateTo('transfer')}
-                  className="flex flex-col items-center gap-2 min-w-[64px]"
-                >
-                  <div className="w-14 h-14 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-center text-soft-mint font-bold text-lg">
-                    {name[0]}
+            {/* Decorative Elements */}
+            <div className="absolute -top-20 -right-20 w-64 h-64 bg-light-green/5 rounded-full blur-3xl group-hover:bg-light-green/10 transition-all duration-1000" />
+            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl group-hover:bg-emerald-500/10 transition-all duration-1000" />
+            
+            <div className="relative z-10">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-1.5 h-1.5 bg-light-green rounded-full animate-pulse" />
+                    <p className="text-soft-mint/40 text-[10px] font-bold uppercase tracking-[0.2em]">Zenith Portfolio</p>
                   </div>
-                  <span className="text-[10px] font-bold text-soft-mint/60">{name}</span>
+                  <h1 className="text-4xl font-bold tracking-tight text-soft-mint">
+                    {showBalance ? `Rs. ${totalBalance.toLocaleString()}` : '••••••••'}
+                  </h1>
+                </div>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setShowBalance(!showBalance); }} 
+                  className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-soft-mint/40 hover:text-soft-mint transition-all border border-white/5"
+                >
+                  {showBalance ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
-              ))}
+              </div>
+
+              <div className="mt-6 flex items-end justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-vibrant-green text-sm font-bold">
+                    <ArrowUpRight size={16} />
+                    <span>+12.4%</span>
+                    <span className="text-soft-mint/20 font-normal text-xs ml-1">this month</span>
+                  </div>
+                  <p className="text-[10px] text-soft-mint/40 font-medium">Last updated: Just now</p>
+                </div>
+                
+                <div className="flex gap-2">
+                  <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center border border-white/5">
+                    <TrendingUp size={16} className="text-light-green" />
+                  </div>
+                  <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center border border-white/5">
+                    <ShieldCheck size={16} className="text-emerald-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Mini Actions */}
+              <div className="mt-8 pt-6 border-t border-white/5 grid grid-cols-2 gap-4">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDialog({
+                      title: 'Add Money',
+                      content: (
+                        <div className="space-y-4">
+                          <p className="text-xs text-soft-mint/60">Enter the amount you want to add to your Zenith account.</p>
+                          <input 
+                            type="number" 
+                            placeholder="Amount (Rs.)" 
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-soft-mint"
+                            onChange={(e) => setInputAmount(e.target.value)}
+                          />
+                          <button 
+                            onClick={() => handleAddMoney(Number(inputAmount))}
+                            className="w-full bg-light-green text-deep-forest-1 py-4 rounded-2xl font-bold"
+                          >
+                            Confirm Top-up
+                          </button>
+                        </div>
+                      )
+                    });
+                  }}
+                  className="flex items-center justify-center gap-2 py-2.5 bg-light-green text-deep-forest-1 rounded-xl text-xs font-bold active:scale-95 transition-transform"
+                >
+                  <Plus size={14} strokeWidth={3} />
+                  Add Money
+                </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDialog({
+                      title: 'Withdraw Money',
+                      content: (
+                        <div className="space-y-4">
+                          <p className="text-xs text-soft-mint/60">Enter the amount you want to withdraw from your Zenith account.</p>
+                          <input 
+                            type="number" 
+                            placeholder="Amount (Rs.)" 
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-soft-mint"
+                            onChange={(e) => setInputAmount(e.target.value)}
+                          />
+                          <button 
+                            onClick={() => handleWithdrawMoney(Number(inputAmount))}
+                            className="w-full bg-forest-green text-soft-mint py-4 rounded-2xl font-bold"
+                          >
+                            Confirm Withdrawal
+                          </button>
+                        </div>
+                      )
+                    });
+                  }}
+                  className="flex items-center justify-center gap-2 py-2.5 bg-white/5 text-soft-mint rounded-xl text-xs font-bold border border-white/10 active:scale-95 transition-transform"
+                >
+                  <ArrowRight size={14} strokeWidth={3} />
+                  Withdraw
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="px-6 mt-8">
-          <div className="grid grid-cols-4 gap-4">
-            {[
-              { id: 'transfer', icon: Send, label: 'Send', color: 'bg-blue-500/10 text-blue-400' },
-              { id: 'bills', icon: Receipt, label: 'Bills', color: 'bg-amber-500/10 text-amber-400' },
-              { id: 'loans', icon: Calculator, label: 'Loans', color: 'bg-emerald-500/10 text-emerald-400' },
-              { id: 'qr_scan', icon: QrCode, label: 'Scan', color: 'bg-purple-500/10 text-purple-400' },
-            ].map(action => (
-              <button 
-                key={action.id}
-                onClick={() => navigateTo(action.id as any)}
-                className="flex flex-col items-center gap-2 group active:scale-90 transition-all"
-              >
-                <div className={`w-14 h-14 ${action.color} rounded-2xl flex items-center justify-center border border-white/5 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                  <action.icon size={24} />
-                </div>
-                <span className="text-[10px] font-bold text-soft-mint/60 uppercase tracking-widest">{action.label}</span>
-              </button>
-            ))}
+        {/* Daily Islamic Verse Widget */}
+        <div className="px-6 mt-6">
+          <div className="glass-card p-5 bg-emerald-600/10 border-emerald-600/20 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-2 opacity-10">
+              <Moon size={80} />
+            </div>
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                <h3 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Verse of the Day</h3>
+              </div>
+              <p className="text-sm font-medium text-soft-mint italic leading-relaxed">
+                "And whoever fears Allah - He will make for him a way out and will provide for him from where he does not expect."
+              </p>
+              <p className="text-[10px] text-soft-mint/40 mt-3 font-bold uppercase tracking-widest">— Surah At-Talaq 2-3</p>
+            </div>
           </div>
         </div>
 
@@ -2723,7 +2862,7 @@ export default function App() {
               { icon: Send, label: 'Send', color: 'bg-blue-500', action: () => navigateTo('transfer') },
               { icon: Receipt, label: 'Bills', color: 'bg-orange-500', action: () => navigateTo('bills') },
               { icon: QrCode, label: 'Scan', color: 'bg-emerald-500', action: () => navigateTo('qr_scan') },
-              { icon: Wallet, label: 'Wallets', color: 'bg-purple-500', action: () => navigateTo('wallets') },
+              { icon: Calculator, label: 'Loans', color: 'bg-emerald-600', action: () => navigateTo('loans') },
               { icon: Repeat, label: 'Jars', color: 'bg-indigo-500', action: () => navigateTo('jars') },
               { icon: MessageSquare, label: 'Social', color: 'bg-pink-500', action: () => navigateTo('social') },
               { icon: Calculator, label: 'Islamic', color: 'bg-yellow-600', action: () => navigateTo('islamic_hub') },
@@ -2772,43 +2911,34 @@ export default function App() {
           </button>
         </div>
 
-        {/* Digital Wallets Section */}
+        {/* Islamic Features Section */}
         <div className="mt-8 px-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-lg text-soft-mint/80">Digital Wallets</h3>
-            <button onClick={() => navigateTo('wallets')} className="text-light-green text-sm font-bold flex items-center gap-1">
-              View All
+            <h3 className="font-bold text-lg text-soft-mint/80">Islamic Features</h3>
+            <button onClick={() => navigateTo('islamic_hub')} className="text-light-green text-sm font-bold flex items-center gap-1">
+              View Hub
             </button>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-            {wallets.filter(w => w.isLinked).map(wallet => (
-              <motion.button 
-                key={wallet.id}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => navigateTo('wallets')}
-                className="min-w-[140px] glass-card p-4 flex flex-col items-center gap-3 bg-white/5 border border-white/5"
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { icon: Calculator, label: 'Zakat', color: 'text-emerald-400', bg: 'bg-emerald-500/10', screen: 'zakat' },
+              { icon: Heart, label: 'Sadaqah', color: 'text-amber-400', bg: 'bg-amber-500/10', screen: 'sadaqah' },
+              { icon: TrendingUp, label: 'Halal Invest', color: 'text-indigo-400', bg: 'bg-indigo-500/10', screen: 'halal_invest' },
+              { icon: Clock, label: 'Prayers', color: 'text-blue-400', bg: 'bg-blue-500/10', screen: 'prayer_times' },
+              { icon: Compass, label: 'Qibla', color: 'text-rose-400', bg: 'bg-rose-500/10', screen: 'qibla' },
+              { icon: Book, label: 'Quran', color: 'text-purple-400', bg: 'bg-purple-500/10', screen: 'quran' },
+            ].map((feature, idx) => (
+              <button 
+                key={idx}
+                onClick={() => navigateTo(feature.screen as any)}
+                className="glass-card p-3 flex flex-col items-center gap-2 bg-white/5 border border-white/10 active:scale-95 transition-transform"
               >
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden bg-white/10`}>
-                  <img src={wallet.logo} alt={wallet.name} className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
+                <div className={`w-10 h-10 ${feature.bg} rounded-xl flex items-center justify-center`}>
+                  <feature.icon size={20} className={feature.color} />
                 </div>
-                <div className="text-center">
-                  <p className="text-xs font-bold text-soft-mint">{wallet.name}</p>
-                  <p className="text-[10px] font-bold text-light-green mt-0.5">Rs. {wallet.balance.toLocaleString()}</p>
-                </div>
-              </motion.button>
+                <span className="text-[10px] font-bold text-soft-mint/60 uppercase tracking-tighter">{feature.label}</span>
+              </button>
             ))}
-            <motion.button 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setScreen('wallets')}
-              className="min-w-[140px] glass-card p-4 flex flex-col items-center justify-center gap-2 border-dashed border-white/20 bg-transparent"
-            >
-              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                <Plus size={20} className="text-soft-mint/40" />
-              </div>
-              <p className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-widest">Link Wallet</p>
-            </motion.button>
           </div>
         </div>
 
@@ -3215,9 +3345,50 @@ export default function App() {
     const [selectedWallet, setSelectedWallet] = useState<DigitalWallet | null>(null);
     const [transferAmount, setTransferAmount] = useState('');
     const [walletPhone, setWalletPhone] = useState('');
-    const [walletStep, setWalletStep] = useState<'input' | 'otp'>('input');
+    const [walletStep, setWalletStep] = useState<'input' | 'otp' | 'stripe'>('input');
     const [walletOtp, setWalletOtp] = useState('');
     const [walletGeneratedOtp, setWalletGeneratedOtp] = useState('');
+
+    const handleStripePayment = async () => {
+      if (!transferAmount) return showToast('Enter amount', 'error');
+      try {
+        const res = await fetch('/api/payments/stripe/create-intent', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ amount: Number(transferAmount) }),
+        });
+        const { clientSecret, error } = await res.json();
+        if (error) throw new Error(error);
+
+        // In a real app, we'd use Stripe Elements here.
+        // For this demo, we'll simulate a successful confirmation.
+        showToast('Simulating Stripe Payment...', 'success');
+        
+        const confirmRes = await fetch('/api/payments/stripe/confirm', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ 
+            paymentIntentId: 'pi_demo_' + Math.random().toString(36).substr(2, 9),
+            amount: Number(transferAmount)
+          }),
+        });
+        
+        if (confirmRes.ok) {
+          showToast('Payment Successful via Stripe', 'success');
+          setDialog(null);
+        } else {
+          showToast('Payment failed', 'error');
+        }
+      } catch (err: any) {
+        showToast(err.message, 'error');
+      }
+    };
 
     const handleWalletAddMoney = async () => {
       if (!walletPhone || !transferAmount) {
@@ -3296,7 +3467,32 @@ export default function App() {
                       title: `Add Money via ${wallet.name}`,
                       content: (
                         <div className="space-y-4">
-                          {walletStep === 'input' ? (
+                          {wallet.name === 'Stripe' ? (
+                            <>
+                              <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-light-green">Rs.</span>
+                                <input 
+                                  type="number" 
+                                  placeholder="Enter amount"
+                                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-soft-mint focus:outline-none focus:border-light-green"
+                                  onChange={(e) => setTransferAmount(e.target.value)}
+                                />
+                              </div>
+                              <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-3">
+                                <input type="text" placeholder="Card Number" className="w-full bg-transparent text-soft-mint focus:outline-none" />
+                                <div className="flex gap-4">
+                                  <input type="text" placeholder="MM/YY" className="w-1/2 bg-transparent text-soft-mint focus:outline-none" />
+                                  <input type="text" placeholder="CVC" className="w-1/2 bg-transparent text-soft-mint focus:outline-none" />
+                                </div>
+                              </div>
+                              <button 
+                                onClick={handleStripePayment}
+                                className="w-full bg-[#635BFF] text-white py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2"
+                              >
+                                Pay with Stripe
+                              </button>
+                            </>
+                          ) : walletStep === 'input' ? (
                             <>
                               <input 
                                 type="tel" 
@@ -3792,8 +3988,147 @@ export default function App() {
     );
   };
 
-  const IslamicHubScreen = () => {
-    const [tab, setTab] = useState<'zakat' | 'sadaqah' | 'invest'>('zakat');
+  const SadaqahScreen = ({ isSubComponent }: { isSubComponent?: boolean; key?: string }) => {
+    const [donateAmount, setDonateAmount] = useState('');
+    return (
+      <div className={`min-h-screen bg-deep-forest-1 pb-32 ${isSubComponent ? 'min-h-0 pb-0' : ''}`}>
+        {!isSubComponent && (
+          <div className="p-6 bg-deep-forest-2/50 backdrop-blur-md sticky top-0 z-30">
+            <div className="flex items-center gap-4 mb-6">
+              <button onClick={goBack} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center">
+                <ChevronRight size={24} className="rotate-180" />
+              </button>
+              <h1 className="text-2xl font-bold text-soft-mint">Sadaqah</h1>
+            </div>
+          </div>
+        )}
+
+        <div className={`${isSubComponent ? '' : 'p-6'} space-y-6`}>
+          <div className="glass-card p-6 bg-emerald-600/10 border-emerald-600/20">
+            <h3 className="text-lg font-bold text-emerald-400 mb-2">One-Tap Sadaqah</h3>
+            <p className="text-sm text-soft-mint/60">Support verified NGOs across Pakistan instantly and securely.</p>
+          </div>
+
+          <div className="space-y-4">
+            {NGOS.map(ngo => (
+              <div key={ngo.id} className="glass-card p-6 bg-white/5 border border-white/10">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center p-2">
+                    <img src={ngo.logo} alt={ngo.name} className="w-12 h-12 object-contain" referrerPolicy="no-referrer" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-soft-mint">{ngo.name}</h4>
+                    <p className="text-[10px] text-light-green font-bold uppercase tracking-widest">{ngo.category}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-soft-mint/60 mb-6 leading-relaxed">{ngo.description}</p>
+                <button 
+                  onClick={() => setDialog({
+                    title: `Donate to ${ngo.name}`,
+                    content: (
+                      <div className="space-y-4">
+                        <input 
+                          type="number" 
+                          placeholder="Amount (Rs.)" 
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-soft-mint"
+                          onChange={(e) => setDonateAmount(e.target.value)}
+                        />
+                        <button 
+                          onClick={() => handleDonate(ngo.id, Number(donateAmount))}
+                          className="w-full bg-forest-green text-soft-mint py-4 rounded-2xl font-bold"
+                        >
+                          Confirm Donation
+                        </button>
+                      </div>
+                    )
+                  })}
+                  className="w-full bg-white/5 text-soft-mint py-3 rounded-xl font-bold text-sm border border-white/10"
+                >
+                  Donate Now
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const HalalInvestScreen = ({ isSubComponent }: { isSubComponent?: boolean; key?: string }) => {
+    const [donateAmount, setDonateAmount] = useState('');
+    return (
+      <div className={`min-h-screen bg-deep-forest-1 pb-32 ${isSubComponent ? 'min-h-0 pb-0' : ''}`}>
+        {!isSubComponent && (
+          <div className="p-6 bg-deep-forest-2/50 backdrop-blur-md sticky top-0 z-30">
+            <div className="flex items-center gap-4 mb-6">
+              <button onClick={goBack} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center">
+                <ChevronRight size={24} className="rotate-180" />
+              </button>
+              <h1 className="text-2xl font-bold text-soft-mint">Halal Invest</h1>
+            </div>
+          </div>
+        )}
+
+        <div className={`${isSubComponent ? '' : 'p-6'} space-y-6`}>
+          <div className="glass-card p-6 bg-indigo-600/10 border-indigo-600/20">
+            <h3 className="text-lg font-bold text-indigo-400 mb-2">Halal Investments</h3>
+            <p className="text-sm text-soft-mint/60">Grow your wealth with Shariah-compliant mutual funds and stocks.</p>
+          </div>
+
+          <div className="space-y-4">
+            {INVESTMENT_FUNDS.map(fund => (
+              <div key={fund.id} className="glass-card p-6 bg-white/5 border border-white/10">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h4 className="font-bold text-soft-mint">{fund.name}</h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${fund.risk === 'Low' ? 'bg-emerald-500/20 text-emerald-400' : fund.risk === 'Medium' ? 'bg-orange-500/20 text-orange-400' : 'bg-red-500/20 text-red-400'}`}>
+                        {fund.risk} Risk
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-widest">Est. Return</p>
+                    <p className="text-lg font-bold text-light-green">{fund.returnRate}</p>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center mt-6">
+                  <p className="text-[10px] text-soft-mint/40">Min. Investment: Rs. {fund.minInvestment.toLocaleString()}</p>
+                  <button 
+                    onClick={() => setDialog({
+                      title: `Invest in ${fund.name}`,
+                      content: (
+                        <div className="space-y-4">
+                          <input 
+                            type="number" 
+                            placeholder="Investment Amount" 
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-soft-mint"
+                            onChange={(e) => setDonateAmount(e.target.value)}
+                          />
+                          <button 
+                            onClick={() => handleInvest(fund.id, Number(donateAmount))}
+                            className="w-full bg-forest-green text-soft-mint py-4 rounded-2xl font-bold"
+                          >
+                            Invest Now
+                          </button>
+                        </div>
+                      )
+                    })}
+                    className="bg-forest-green text-soft-mint px-6 py-2 rounded-xl font-bold text-xs"
+                  >
+                    Invest
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const IslamicHubScreen = ({ initialTab = 'zakat' }: { initialTab?: 'zakat' | 'sadaqah' | 'invest' | 'prayers' | 'qibla' | 'quran'; key?: string }) => {
+    const [tab, setTab] = useState(initialTab);
     const [donateAmount, setDonateAmount] = useState('');
 
     return (
@@ -3806,16 +4141,19 @@ export default function App() {
             <h1 className="text-2xl font-bold text-soft-mint">Islamic Hub</h1>
           </div>
           
-          <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
+          <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5 overflow-x-auto hide-scrollbar">
             {[
               { id: 'zakat', label: 'Zakat' },
               { id: 'sadaqah', label: 'Sadaqah' },
               { id: 'invest', label: 'Invest' },
+              { id: 'prayers', label: 'Prayers' },
+              { id: 'qibla', label: 'Qibla' },
+              { id: 'quran', label: 'Quran' },
             ].map(t => (
               <button 
                 key={t.id}
                 onClick={() => setTab(t.id as any)}
-                className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${tab === t.id ? 'bg-forest-green text-soft-mint shadow-lg' : 'text-soft-mint/40'}`}
+                className={`flex-1 min-w-[80px] py-3 rounded-xl text-xs font-bold transition-all ${tab === t.id ? 'bg-forest-green text-soft-mint shadow-lg' : 'text-soft-mint/40'}`}
               >
                 {t.label}
               </button>
@@ -3825,113 +4163,203 @@ export default function App() {
 
         <div className="p-6">
           {tab === 'zakat' && <ZakatCalculatorScreen isSubComponent />}
-          
-          {tab === 'sadaqah' && (
-            <div className="space-y-6">
-              <div className="glass-card p-6 bg-emerald-600/10 border-emerald-600/20">
-                <h3 className="text-lg font-bold text-emerald-400 mb-2">One-Tap Sadaqah</h3>
-                <p className="text-sm text-soft-mint/60">Support verified NGOs across Pakistan instantly and securely.</p>
-              </div>
+          {tab === 'prayers' && <PrayerTimesScreen isSubComponent />}
+          {tab === 'qibla' && <QiblaScreen isSubComponent />}
+          {tab === 'quran' && <QuranScreen isSubComponent />}
+          {tab === 'sadaqah' && <SadaqahScreen isSubComponent />}
+          {tab === 'invest' && <HalalInvestScreen isSubComponent />}
+        </div>
+      </div>
+    );
+  };
 
-              <div className="space-y-4">
-                {NGOS.map(ngo => (
-                  <div key={ngo.id} className="glass-card p-6 bg-white/5 border border-white/10">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center p-2">
-                        <img src={ngo.logo} alt={ngo.name} className="w-12 h-12 object-contain" referrerPolicy="no-referrer" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-soft-mint">{ngo.name}</h4>
-                        <p className="text-[10px] text-light-green font-bold uppercase tracking-widest">{ngo.category}</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-soft-mint/60 mb-6 leading-relaxed">{ngo.description}</p>
-                    <button 
-                      onClick={() => setDialog({
-                        title: `Donate to ${ngo.name}`,
-                        content: (
-                          <div className="space-y-4">
-                            <input 
-                              type="number" 
-                              placeholder="Amount (Rs.)" 
-                              className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-soft-mint"
-                              onChange={(e) => setDonateAmount(e.target.value)}
-                            />
-                            <button 
-                              onClick={() => handleDonate(ngo.id, Number(donateAmount))}
-                              className="w-full bg-forest-green text-soft-mint py-4 rounded-2xl font-bold"
-                            >
-                              Confirm Donation
-                            </button>
-                          </div>
-                        )
-                      })}
-                      className="w-full bg-white/5 text-soft-mint py-3 rounded-xl font-bold text-sm border border-white/10"
-                    >
-                      Donate Now
-                    </button>
-                  </div>
-                ))}
+  const PrayerTimesScreen = ({ isSubComponent }: { isSubComponent?: boolean; key?: string }) => {
+    const prayerTimes = [
+      { name: 'Fajr', time: '04:45 AM', status: 'Passed' },
+      { name: 'Sunrise', time: '06:12 AM', status: 'Passed' },
+      { name: 'Dhuhr', time: '12:30 PM', status: 'Current' },
+      { name: 'Asr', time: '04:15 PM', status: 'Upcoming' },
+      { name: 'Maghrib', time: '06:45 PM', status: 'Upcoming' },
+      { name: 'Isha', time: '08:15 PM', status: 'Upcoming' },
+    ];
+
+    return (
+      <div className={`min-h-screen bg-deep-forest-1 pb-32 ${isSubComponent ? 'min-h-0 pb-0' : ''}`}>
+        {!isSubComponent && (
+          <div className="p-6 bg-deep-forest-2/50 backdrop-blur-md sticky top-0 z-30">
+            <div className="flex items-center gap-4 mb-6">
+              <button onClick={goBack} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center">
+                <ChevronRight size={24} className="rotate-180" />
+              </button>
+              <h1 className="text-2xl font-bold text-soft-mint">Prayer Times</h1>
+            </div>
+            <div className="glass-card p-6 bg-emerald-600/10 border-emerald-600/20 flex justify-between items-center">
+              <div>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Next Prayer</p>
+                <h2 className="text-2xl font-bold text-soft-mint mt-1">Asr</h2>
+                <p className="text-xs text-soft-mint/60 mt-1">In 3 hours 45 mins</p>
+              </div>
+              <div className="text-right">
+                <Clock size={40} className="text-emerald-400 opacity-20" />
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {tab === 'invest' && (
-            <div className="space-y-6">
-              <div className="glass-card p-6 bg-indigo-600/10 border-indigo-600/20">
-                <h3 className="text-lg font-bold text-indigo-400 mb-2">Halal Investments</h3>
-                <p className="text-sm text-soft-mint/60">Grow your wealth with Shariah-compliant mutual funds and stocks.</p>
+        {isSubComponent && (
+          <div className="glass-card p-6 bg-emerald-600/10 border-emerald-600/20 flex justify-between items-center mb-6">
+            <div>
+              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Next Prayer</p>
+              <h2 className="text-2xl font-bold text-soft-mint mt-1">Asr</h2>
+              <p className="text-xs text-soft-mint/60 mt-1">In 3 hours 45 mins</p>
+            </div>
+            <div className="text-right">
+              <Clock size={40} className="text-emerald-400 opacity-20" />
+            </div>
+          </div>
+        )}
+
+        <div className={`${isSubComponent ? '' : 'p-6'} space-y-4`}>
+          {prayerTimes.map((prayer, idx) => (
+            <div 
+              key={idx}
+              className={`glass-card p-4 flex justify-between items-center border ${prayer.status === 'Current' ? 'bg-emerald-600/20 border-emerald-600/40' : 'bg-white/5 border-white/5'}`}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${prayer.status === 'Current' ? 'bg-emerald-400 text-deep-forest-1' : 'bg-white/5 text-soft-mint/40'}`}>
+                  <Clock size={20} />
+                </div>
+                <div>
+                  <p className="font-bold text-soft-mint">{prayer.name}</p>
+                  <p className="text-[10px] text-soft-mint/40 uppercase tracking-widest">{prayer.status}</p>
+                </div>
               </div>
+              <p className={`text-lg font-bold ${prayer.status === 'Current' ? 'text-emerald-400' : 'text-soft-mint'}`}>{prayer.time}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
-              <div className="space-y-4">
-                {INVESTMENT_FUNDS.map(fund => (
-                  <div key={fund.id} className="glass-card p-6 bg-white/5 border border-white/10">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h4 className="font-bold text-soft-mint">{fund.name}</h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${fund.risk === 'Low' ? 'bg-emerald-500/20 text-emerald-400' : fund.risk === 'Medium' ? 'bg-orange-500/20 text-orange-400' : 'bg-red-500/20 text-red-400'}`}>
-                            {fund.risk} Risk
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-widest">Est. Return</p>
-                        <p className="text-lg font-bold text-light-green">{fund.returnRate}</p>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center mt-6">
-                      <p className="text-[10px] text-soft-mint/40">Min. Investment: Rs. {fund.minInvestment.toLocaleString()}</p>
-                      <button 
-                        onClick={() => setDialog({
-                          title: `Invest in ${fund.name}`,
-                          content: (
-                            <div className="space-y-4">
-                              <input 
-                                type="number" 
-                                placeholder="Investment Amount" 
-                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-soft-mint"
-                                onChange={(e) => setDonateAmount(e.target.value)}
-                              />
-                              <button 
-                                onClick={() => handleInvest(fund.id, Number(donateAmount))}
-                                className="w-full bg-forest-green text-soft-mint py-4 rounded-2xl font-bold"
-                              >
-                                Invest Now
-                              </button>
-                            </div>
-                          )
-                        })}
-                        className="bg-forest-green text-soft-mint px-6 py-2 rounded-xl font-bold text-xs"
-                      >
-                        Invest
-                      </button>
-                    </div>
-                  </div>
-                ))}
+  const QiblaScreen = ({ isSubComponent }: { isSubComponent?: boolean; key?: string }) => {
+    return (
+      <div className={`min-h-screen bg-deep-forest-1 pb-32 ${isSubComponent ? 'min-h-0 pb-0' : ''}`}>
+        {!isSubComponent && (
+          <div className="p-6 bg-deep-forest-2/50 backdrop-blur-md sticky top-0 z-30">
+            <div className="flex items-center gap-4 mb-6">
+              <button onClick={goBack} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center">
+                <ChevronRight size={24} className="rotate-180" />
+              </button>
+              <h1 className="text-2xl font-bold text-soft-mint">Qibla Finder</h1>
+            </div>
+          </div>
+        )}
+
+        <div className={`flex flex-col items-center justify-center ${isSubComponent ? '' : 'p-6 mt-12'}`}>
+          <div className="relative w-72 h-72">
+            <div className="absolute inset-0 border-4 border-white/5 rounded-full" />
+            <div className="absolute inset-4 border-2 border-white/10 rounded-full border-dashed" />
+            
+            {/* Compass Rose */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-full h-full relative animate-[spin_10s_linear_infinite] opacity-20">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 text-soft-mint font-bold">N</div>
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-soft-mint font-bold">S</div>
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 text-soft-mint font-bold">W</div>
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 text-soft-mint font-bold">E</div>
               </div>
             </div>
-          )}
+
+            {/* Qibla Needle */}
+            <motion.div 
+              animate={{ rotate: 265 }}
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              <div className="relative w-1 h-48 bg-gradient-to-b from-rose-500 to-transparent rounded-full">
+                <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-rose-500">
+                  <Compass size={32} />
+                </div>
+              </div>
+            </motion.div>
+
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-4 h-4 bg-soft-mint rounded-full shadow-[0_0_20px_rgba(255,255,255,0.5)]" />
+            </div>
+          </div>
+
+          <div className="mt-16 text-center">
+            <p className="text-4xl font-bold text-soft-mint">265°</p>
+            <p className="text-sm text-soft-mint/60 mt-2 uppercase tracking-widest font-bold">Degrees from North</p>
+            <div className="mt-8 glass-card p-4 bg-rose-500/10 border-rose-500/20">
+              <p className="text-xs text-rose-400 font-bold">Rotate your phone to align with the red needle</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const QuranScreen = ({ isSubComponent }: { isSubComponent?: boolean; key?: string }) => {
+    const surahs = [
+      { id: 1, name: 'Al-Fatihah', meaning: 'The Opening', verses: 7, type: 'Meccan' },
+      { id: 2, name: 'Al-Baqarah', meaning: 'The Cow', verses: 286, type: 'Medinan' },
+      { id: 3, name: 'Ali \'Imran', meaning: 'Family of Imran', verses: 200, type: 'Medinan' },
+      { id: 4, name: 'An-Nisa', meaning: 'The Women', verses: 176, type: 'Medinan' },
+      { id: 5, name: 'Al-Ma\'idah', meaning: 'The Table Spread', verses: 120, type: 'Medinan' },
+    ];
+
+    return (
+      <div className={`min-h-screen bg-deep-forest-1 pb-32 ${isSubComponent ? 'min-h-0 pb-0' : ''}`}>
+        {!isSubComponent && (
+          <div className="p-6 bg-deep-forest-2/50 backdrop-blur-md sticky top-0 z-30">
+            <div className="flex items-center gap-4 mb-6">
+              <button onClick={goBack} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center">
+                <ChevronRight size={24} className="rotate-180" />
+              </button>
+              <h1 className="text-2xl font-bold text-soft-mint">Holy Quran</h1>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-soft-mint/40" size={20} />
+              <input 
+                type="text" 
+                placeholder="Search Surah..." 
+                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-6 text-soft-mint focus:outline-none focus:border-forest-green transition-colors"
+              />
+            </div>
+          </div>
+        )}
+
+        {isSubComponent && (
+          <div className="relative mb-6">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-soft-mint/40" size={20} />
+            <input 
+              type="text" 
+              placeholder="Search Surah..." 
+              className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-6 text-soft-mint focus:outline-none focus:border-forest-green transition-colors"
+            />
+          </div>
+        )}
+
+        <div className={`${isSubComponent ? '' : 'p-6'} space-y-4`}>
+          {surahs.map((surah) => (
+            <button 
+              key={surah.id}
+              className="w-full glass-card p-4 flex items-center gap-4 bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-left group"
+            >
+              <div className="w-12 h-12 bg-forest-green/20 rounded-2xl flex items-center justify-center text-light-green font-bold group-hover:bg-forest-green group-hover:text-soft-mint transition-colors">
+                {surah.id}
+              </div>
+              <div className="flex-1">
+                <h4 className="font-bold text-soft-mint">{surah.name}</h4>
+                <p className="text-[10px] text-soft-mint/40 uppercase tracking-widest">{surah.meaning}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-bold text-soft-mint/60">{surah.verses} Verses</p>
+                <p className="text-[10px] text-soft-mint/20 uppercase tracking-widest mt-1">{surah.type}</p>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
     );
@@ -5201,6 +5629,11 @@ export default function App() {
         {screen === 'jars' && <SavingJarsScreen key="jars" />}
         {screen === 'social' && <SocialScreen key="social" />}
         {screen === 'islamic_hub' && <IslamicHubScreen key="islamic_hub" />}
+        {screen === 'prayer_times' && <PrayerTimesScreen key="prayer_times" />}
+        {screen === 'qibla' && <QiblaScreen key="qibla" />}
+        {screen === 'quran' && <QuranScreen key="quran" />}
+        {screen === 'sadaqah' && <SadaqahScreen key="sadaqah" />}
+        {screen === 'halal_invest' && <HalalInvestScreen key="halal_invest" />}
         {screen === 'notifications' && <NotificationsScreen key="notifications" />}
         {screen === 'transactions' && <TransactionsScreen key="transactions" />}
         {screen === 'search' && <SearchScreen key="search" />}
@@ -5240,7 +5673,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Bottom Navigation */}
-      {['dashboard', 'transfer', 'bills', 'chat', 'zakat', 'subscriptions', 'fx_wallet', 'analytics', 'cards', 'profile', 'wallets', 'jars', 'social', 'islamic_hub', 'notifications', 'transactions', 'search', 'voice_banking', 'offers', 'loans'].includes(screen) && (
+      {['dashboard', 'transfer', 'bills', 'chat', 'zakat', 'subscriptions', 'fx_wallet', 'analytics', 'cards', 'profile', 'wallets', 'jars', 'social', 'islamic_hub', 'notifications', 'transactions', 'search', 'voice_banking', 'offers', 'loans', 'prayer_times', 'qibla', 'quran', 'sadaqah', 'halal_invest'].includes(screen) && (
         <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-deep-forest-2/90 backdrop-blur-2xl border-t border-white/5 px-6 py-4 flex justify-between items-center z-40 rounded-t-[40px] shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
           {[
             { id: 'home', icon: Home, label: 'Home', screen: 'dashboard' },
