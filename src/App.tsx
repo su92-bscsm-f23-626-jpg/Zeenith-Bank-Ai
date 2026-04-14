@@ -9,7 +9,10 @@ import {
   Tooltip,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  BarChart,
+  Bar,
+  Legend
 } from 'recharts';
 import { 
   Wallet, 
@@ -479,6 +482,8 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [txFilterType, setTxFilterType] = useState<'all' | 'credit' | 'debit'>('all');
+  const [txFilterCategory, setTxFilterCategory] = useState('All');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'analytics' | 'ai' | 'cards' | 'profile'>('home');
@@ -3028,7 +3033,8 @@ export default function App() {
 
   const AnalyticsScreen = () => {
     const [timeframe, setTimeframe] = useState<'week' | 'month'>('week');
-    const data = timeframe === 'week' ? [
+    
+    const spendingData = timeframe === 'week' ? [
       { name: 'Mon', amount: 4000 },
       { name: 'Tue', amount: 3000 },
       { name: 'Wed', amount: 2000 },
@@ -3043,12 +3049,22 @@ export default function App() {
       { name: 'Week 4', amount: 12780 },
     ];
 
-    const pieData = [
-      { name: 'Shopping', value: 400, color: '#68BA7F' },
-      { name: 'Food', value: 300, color: '#2E7D32' },
-      { name: 'Bills', value: 300, color: '#CFFFDC' },
-      { name: 'Travel', value: 200, color: '#071a09' },
+    const trendData = [
+      { name: 'Jan', income: 120000, expense: 45000 },
+      { name: 'Feb', income: 125000, expense: 52000 },
+      { name: 'Mar', income: 118000, expense: 48000 },
+      { name: 'Apr', income: 130000, expense: 60000 },
     ];
+
+    const pieData = [
+      { name: 'Shopping', value: 40000, color: '#68BA7F' },
+      { name: 'Food', value: 30000, color: '#2E7D32' },
+      { name: 'Bills', value: 30000, color: '#CFFFDC' },
+      { name: 'Travel', value: 20000, color: '#071a09' },
+      { name: 'Health', value: 15000, color: '#1B5E20' },
+    ];
+
+    const COLORS = ['#68BA7F', '#2E7D32', '#CFFFDC', '#071a09', '#1B5E20'];
 
     return (
       <div className="min-h-screen bg-deep-forest-1 pb-32 p-6">
@@ -3066,19 +3082,48 @@ export default function App() {
           </button>
         </div>
 
+        {/* Overview Cards */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="glass-card p-4 bg-emerald-500/5 border-emerald-500/10">
+            <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-2">
+              <ArrowDownLeft size={16} className="text-emerald-400" />
+            </div>
+            <p className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-widest">Total Income</p>
+            <p className="text-lg font-bold text-soft-mint">Rs. 130,000</p>
+            <p className="text-[10px] text-emerald-400 mt-1 font-bold">+12% vs last month</p>
+          </div>
+          <div className="glass-card p-4 bg-red-500/5 border-red-500/10">
+            <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center mb-2">
+              <ArrowUpRight size={16} className="text-red-400" />
+            </div>
+            <p className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-widest">Total Expense</p>
+            <p className="text-lg font-bold text-soft-mint">Rs. 60,000</p>
+            <p className="text-[10px] text-red-400 mt-1 font-bold">+5% vs last month</p>
+          </div>
+        </div>
+
+        {/* Spending Trend Chart */}
         <div className="glass-card p-6 mb-6">
-          <p className="text-soft-mint/40 text-xs font-bold uppercase tracking-widest mb-2">Total Spending</p>
-          <h2 className="text-3xl font-bold text-soft-mint">Rs. 45,200</h2>
-          <div className="h-48 mt-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h3 className="font-bold text-soft-mint">Spending Trend</h3>
+              <p className="text-[10px] text-soft-mint/40 uppercase font-bold tracking-widest">Daily breakdown</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xl font-bold text-soft-mint">Rs. 45,200</p>
+              <p className="text-[10px] text-emerald-400 font-bold">On track</p>
+            </div>
+          </div>
+          <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
+              <AreaChart data={spendingData}>
                 <defs>
                   <linearGradient id="colorAmt" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#68BA7F" stopOpacity={0.3}/>
                     <stop offset="95%" stopColor="#68BA7F" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff10" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#ffffff40', fontSize: 10}} />
                 <YAxis hide />
                 <Tooltip 
@@ -3091,64 +3136,153 @@ export default function App() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="glass-card p-4">
-            <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-2">
-              <ArrowDownLeft size={16} className="text-emerald-400" />
-            </div>
-            <p className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-widest">Income</p>
-            <p className="text-lg font-bold text-soft-mint">Rs. 120k</p>
-          </div>
-          <div className="glass-card p-4">
-            <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center mb-2">
-              <ArrowUpRight size={16} className="text-red-400" />
-            </div>
-            <p className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-widest">Expense</p>
-            <p className="text-lg font-bold text-soft-mint">Rs. 45k</p>
+        {/* Income vs Expense Comparison */}
+        <div className="glass-card p-6 mb-6">
+          <h3 className="font-bold text-soft-mint mb-6">Income vs Expense</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#ffffff40', fontSize: 10}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#ffffff40', fontSize: 10}} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0d2810', border: 'none', borderRadius: '12px', color: '#CFFFDC' }}
+                  cursor={{fill: '#ffffff05'}}
+                />
+                <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ paddingBottom: '20px', fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }} />
+                <Bar dataKey="income" fill="#68BA7F" radius={[4, 4, 0, 0]} barSize={20} />
+                <Bar dataKey="expense" fill="#ff4d4d" radius={[4, 4, 0, 0]} barSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        <h3 className="font-bold text-lg mb-4 text-soft-mint/80">Spending Breakdown</h3>
-        <div className="space-y-4 mb-8">
+        {/* Spending Breakdown with Pie Chart */}
+        <div className="glass-card p-6 mb-6">
+          <h3 className="font-bold text-soft-mint mb-6">Category Breakdown</h3>
+          <div className="flex items-center gap-4">
+            <div className="w-1/2 h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={60}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0d2810', border: 'none', borderRadius: '12px', color: '#CFFFDC' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="w-1/2 space-y-2">
+              {pieData.map((item, i) => (
+                <div key={i} className="flex items-center justify-between text-[10px]">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-soft-mint/60 font-bold uppercase">{item.name}</span>
+                  </div>
+                  <span className="text-soft-mint font-bold">{Math.round((item.value / 135000) * 100)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Detailed Breakdown List */}
+        <h3 className="font-bold text-lg mb-4 text-soft-mint/80">Detailed Spending</h3>
+        <div className="space-y-3 mb-8">
           {pieData.map((item, i) => (
-            <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+            <div key={i} className="glass-card p-4 flex items-center gap-4 bg-white/5 border-white/5">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/5">
+                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }} />
+              </div>
               <div className="flex-1">
-                <h4 className="font-bold text-sm text-soft-mint">{item.name}</h4>
-                <div className="w-full h-1.5 bg-white/5 rounded-full mt-2 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${(item.value / 1200) * 100}%`, backgroundColor: item.color }} />
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="font-bold text-sm text-soft-mint">{item.name}</h4>
+                  <p className="font-bold text-sm text-soft-mint">Rs. {item.value.toLocaleString()}</p>
+                </div>
+                <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(item.value / 40000) * 100}%` }}
+                    transition={{ duration: 1, delay: i * 0.1 }}
+                    className="h-full rounded-full" 
+                    style={{ backgroundColor: item.color }} 
+                  />
                 </div>
               </div>
-              <p className="font-bold text-sm text-soft-mint">Rs. {item.value * 100}</p>
             </div>
           ))}
         </div>
 
         {/* AI Insights Section */}
         <div className="mt-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Bot size={20} className="text-light-green" />
-            <h3 className="font-bold text-lg text-soft-mint/80">AI Financial Insights</h3>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-light-green/20 rounded-xl flex items-center justify-center">
+              <Bot size={24} className="text-light-green" />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-soft-mint">AI Financial Insights</h3>
+              <p className="text-[10px] text-soft-mint/40 uppercase font-bold tracking-widest">Powered by Zenith AI</p>
+            </div>
           </div>
           <div className="space-y-4">
             {[
-              { title: 'Spending Alert', desc: 'Your food expenses are 15% higher than last week. Consider cooking at home more often.', icon: AlertCircle, color: 'text-orange-400' },
-              { title: 'Savings Opportunity', desc: 'You could save Rs. 2,500 by switching to a yearly subscription for Netflix.', icon: TrendingUp, color: 'text-emerald-400' },
-              { title: 'Budget Status', desc: 'You are on track to save Rs. 15,000 this month. Keep it up!', icon: CheckCircle2, color: 'text-blue-400' }
+              { 
+                title: 'Spending Alert', 
+                desc: 'Your "Food & Dining" expenses are 15% higher than your 3-month average. We recommend setting a budget of Rs. 25,000 for next month.', 
+                icon: AlertCircle, 
+                color: 'text-orange-400',
+                bg: 'bg-orange-400/10'
+              },
+              { 
+                title: 'Savings Opportunity', 
+                desc: 'You have Rs. 45,000 sitting idle in your main account. Moving this to the "Zenith Shariah Growth Fund" could earn you ~Rs. 8,000 annually.', 
+                icon: TrendingUp, 
+                color: 'text-emerald-400',
+                bg: 'bg-emerald-400/10'
+              },
+              { 
+                title: 'Subscription Audit', 
+                desc: 'You have 3 entertainment subscriptions that haven\'t been used in 30 days. Canceling them could save you Rs. 3,200/month.', 
+                icon: Receipt, 
+                color: 'text-blue-400',
+                bg: 'bg-blue-400/10'
+              },
+              { 
+                title: 'Budget Milestone', 
+                desc: 'Great job! You\'ve stayed within your "Travel" budget for 4 consecutive weeks. You\'re on track to reach your Hajj goal 2 months early.', 
+                icon: CheckCircle2, 
+                color: 'text-light-green',
+                bg: 'bg-light-green/10'
+              }
             ].map((insight, i) => (
               <motion.div 
                 key={i}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.2 }}
-                className="glass-card p-4 bg-white/5 border-white/10 flex gap-4"
+                className="glass-card p-5 bg-white/5 border-white/10 flex gap-4 relative overflow-hidden group"
               >
-                <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center ${insight.color}`}>
-                  <insight.icon size={20} />
+                <div className={`absolute top-0 left-0 w-1 h-full ${insight.color.replace('text-', 'bg-')}`} />
+                <div className={`w-12 h-12 shrink-0 rounded-2xl ${insight.bg} flex items-center justify-center ${insight.color} group-hover:scale-110 transition-transform`}>
+                  <insight.icon size={24} />
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-bold text-sm text-soft-mint">{insight.title}</h4>
-                  <p className="text-xs text-soft-mint/60 mt-1 leading-relaxed">{insight.desc}</p>
+                  <div className="flex justify-between items-start mb-1">
+                    <h4 className="font-bold text-base text-soft-mint">{insight.title}</h4>
+                    <ChevronRight size={16} className="text-soft-mint/20" />
+                  </div>
+                  <p className="text-sm text-soft-mint/60 leading-relaxed">{insight.desc}</p>
                 </div>
               </motion.div>
             ))}
@@ -5065,47 +5199,116 @@ export default function App() {
   };
 
   const TransactionsScreen = () => {
+    const categories = ['All', ...new Set(transactions.map(t => t.category))];
+    
+    const filteredTransactions = transactions.filter(tx => {
+      const matchesSearch = tx.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                           tx.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesType = txFilterType === 'all' || tx.type === txFilterType;
+      const matchesCategory = txFilterCategory === 'All' || tx.category === txFilterCategory;
+      return matchesSearch && matchesType && matchesCategory;
+    });
+
     return (
       <div className="min-h-screen bg-deep-forest-1 pb-32">
-        <div className="p-6 flex items-center justify-between bg-deep-forest-2/50 backdrop-blur-md sticky top-0 z-30">
-          <div className="flex items-center gap-4">
+        <div className="p-6 bg-deep-forest-2/50 backdrop-blur-md sticky top-0 z-30">
+          <div className="flex items-center gap-4 mb-6">
             <button onClick={goBack} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center">
               <ChevronRight size={24} className="rotate-180" />
             </button>
             <h1 className="text-2xl font-bold text-soft-mint">All Activity</h1>
           </div>
-          <button 
-            onClick={() => setScreen('search')}
-            className="w-10 h-10 glass-card !rounded-full flex items-center justify-center active:scale-90 transition-all"
-          >
-            <Search size={20} className="text-soft-mint/80" />
-          </button>
+
+          {/* Search Bar */}
+          <div className="relative mb-6">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-soft-mint/40" />
+            <input 
+              type="text" 
+              placeholder="Search transactions..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-soft-mint focus:outline-none focus:border-light-green transition-all"
+            />
+          </div>
+
+          {/* Type Filters */}
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-2 hide-scrollbar">
+            {['all', 'credit', 'debit'].map((type) => (
+              <button
+                key={type}
+                onClick={() => setTxFilterType(type as any)}
+                className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${
+                  txFilterType === type 
+                    ? 'bg-light-green text-deep-forest-1 shadow-lg shadow-light-green/20' 
+                    : 'bg-white/5 text-soft-mint/60 hover:bg-white/10'
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+
+          {/* Category Filters */}
+          <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setTxFilterCategory(cat)}
+                className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${
+                  txFilterCategory === cat 
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' 
+                    : 'bg-white/5 text-soft-mint/60 hover:bg-white/10'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="p-6 space-y-4">
-          {transactions.map(tx => (
-            <div 
-              key={tx.id} 
-              onClick={() => setSelectedTxForReceipt(tx)}
-              className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors cursor-pointer group"
-            >
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${tx.type === 'credit' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
-                {tx.type === 'credit' ? <ArrowDownLeft size={20} className="text-emerald-400" /> : <ArrowUpRight size={20} className="text-red-400" />}
+          {filteredTransactions.length > 0 ? (
+            filteredTransactions.map(tx => (
+              <div 
+                key={tx.id} 
+                onClick={() => setSelectedTxForReceipt(tx)}
+                className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors cursor-pointer group"
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${tx.type === 'credit' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
+                  {tx.type === 'credit' ? <ArrowDownLeft size={20} className="text-emerald-400" /> : <ArrowUpRight size={20} className="text-red-400" />}
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-sm text-soft-mint group-hover:text-light-green transition-colors">{tx.title}</h4>
+                  <p className="text-[10px] text-soft-mint/40 font-bold uppercase tracking-wider">{tx.category} • {tx.date}</p>
+                </div>
+                <div className="text-right">
+                  <p className={`font-bold text-sm ${tx.type === 'credit' ? 'text-emerald-400' : 'text-soft-mint'}`}>
+                    {tx.type === 'credit' ? '+' : '-'} Rs. {Math.abs(tx.amount).toLocaleString()}
+                  </p>
+                  <button className="text-[9px] font-bold text-soft-mint/20 uppercase tracking-widest group-hover:text-soft-mint/60 transition-colors mt-1">
+                    Receipt
+                  </button>
+                </div>
               </div>
-              <div className="flex-1">
-                <h4 className="font-bold text-sm text-soft-mint group-hover:text-light-green transition-colors">{tx.title}</h4>
-                <p className="text-[10px] text-soft-mint/40 font-bold uppercase tracking-wider">{tx.category} • {tx.date}</p>
+            ))
+          ) : (
+            <div className="text-center py-20">
+              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search size={24} className="text-soft-mint/20" />
               </div>
-              <div className="text-right">
-                <p className={`font-bold text-sm ${tx.type === 'credit' ? 'text-emerald-400' : 'text-soft-mint'}`}>
-                  {tx.type === 'credit' ? '+' : '-'} Rs. {Math.abs(tx.amount).toLocaleString()}
-                </p>
-                <button className="text-[9px] font-bold text-soft-mint/20 uppercase tracking-widest group-hover:text-soft-mint/60 transition-colors mt-1">
-                  Receipt
-                </button>
-              </div>
+              <p className="text-soft-mint/40 font-bold">No transactions found</p>
+              <button 
+                onClick={() => {
+                  setSearchQuery('');
+                  setTxFilterType('all');
+                  setTxFilterCategory('All');
+                }}
+                className="mt-4 text-xs font-bold text-light-green uppercase tracking-widest"
+              >
+                Clear all filters
+              </button>
             </div>
-          ))}
+          )}
         </div>
       </div>
     );
