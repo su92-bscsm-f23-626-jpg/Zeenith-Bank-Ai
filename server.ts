@@ -33,6 +33,11 @@ if (!getApps().length) {
 const db = getFirestore(firebaseAppletConfig.firestoreDatabaseId);
 const adminAuth = getAdminAuth();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+if (process.env.STRIPE_SECRET_KEY) {
+  console.log("Stripe Secret Key detected.");
+} else {
+  console.warn("Stripe Secret Key NOT detected. Stripe features will be disabled.");
+}
 const JWT_SECRET = process.env.JWT_SECRET || "zenith-bank-ai-secret-key-2026";
 const geminiApiKey = process.env.GEMINI_API_KEY;
 
@@ -56,6 +61,32 @@ const authenticateToken = (req: any, res: Response, next: NextFunction) => {
     next();
   });
 };
+
+// --- Stripe Health Check ---
+app.get("/api/stripe/health", async (req: Request, res: Response) => {
+  try {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return res.status(400).json({ 
+        status: "error", 
+        message: "STRIPE_SECRET_KEY is not set in environment variables." 
+      });
+    }
+    
+    // Try to retrieve balance to verify the key
+    const balance = await stripe.balance.retrieve();
+    res.json({ 
+      status: "ok", 
+      message: "Stripe is working!", 
+      balance: balance
+    });
+  } catch (error: any) {
+    res.status(500).json({ 
+      status: "error", 
+      message: "Stripe connection failed.", 
+      error: error.message 
+    });
+  }
+});
 
 // --- 1. USER AUTHENTICATION SYSTEM ---
 

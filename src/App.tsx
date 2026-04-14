@@ -2907,9 +2907,9 @@ export default function App() {
               { icon: Bot, label: 'AI Chat', color: 'bg-indigo-500', action: () => navigateTo('chat') },
               { icon: Mic, label: 'Voice', color: 'bg-emerald-600', action: () => navigateTo('voice_banking') },
               { icon: MapPin, label: 'Offers', color: 'bg-rose-500', action: () => navigateTo('offers') },
-            ].map((item, i) => (
+            ].map((item) => (
               <button 
-                key={i} 
+                key={item.label} 
                 onClick={item.action}
                 className="flex flex-col items-center gap-2 group"
               >
@@ -3267,7 +3267,7 @@ export default function App() {
               }
             ].map((insight, i) => (
               <motion.div 
-                key={i}
+                key={insight.title}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.2 }}
@@ -3471,9 +3471,9 @@ export default function App() {
 
             <div className="space-y-4">
               <h3 className="font-bold text-lg text-soft-mint/80 mb-4">Card Settings</h3>
-              {cardActions.map((item, i) => (
+              {cardActions.map((item) => (
                 <button 
-                  key={i}
+                  key={item.label}
                   onClick={item.action}
                   className="w-full glass-card p-4 flex items-center gap-4 group active:scale-[0.98] transition-all"
                 >
@@ -3515,6 +3515,20 @@ export default function App() {
     const [walletStep, setWalletStep] = useState<'input' | 'otp' | 'stripe'>('input');
     const [walletOtp, setWalletOtp] = useState('');
     const [walletGeneratedOtp, setWalletGeneratedOtp] = useState('');
+
+    const testStripeConnection = async () => {
+      try {
+        const res = await fetch('/api/stripe/health');
+        const data = await res.json();
+        if (data.status === 'ok') {
+          showToast('Stripe Connection: OK!', 'success');
+        } else {
+          showToast(`Stripe Error: ${data.message}`, 'error');
+        }
+      } catch (err: any) {
+        showToast('Failed to connect to Stripe health endpoint', 'error');
+      }
+    };
 
     const handleStripePayment = async () => {
       if (!transferAmount) return showToast('Enter amount', 'error');
@@ -3657,6 +3671,12 @@ export default function App() {
                                 className="w-full bg-[#635BFF] text-white py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2"
                               >
                                 Pay with Stripe
+                              </button>
+                              <button 
+                                onClick={testStripeConnection}
+                                className="w-full bg-white/5 text-soft-mint/40 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-colors"
+                              >
+                                Test Stripe Connection
                               </button>
                             </>
                           ) : walletStep === 'input' ? (
@@ -3939,9 +3959,9 @@ export default function App() {
           <div>
             <h3 className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-[0.2em] mb-4">Quick Split</h3>
             <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar">
-              {['Ahmed', 'Sara', 'Zain', 'Dania', 'Bilal'].map((name, i) => (
+              {['Ahmed', 'Sara', 'Zain', 'Dania', 'Bilal'].map((name) => (
                 <motion.button 
-                  key={i} 
+                  key={name} 
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={() => setDialog({
@@ -4755,9 +4775,9 @@ export default function App() {
         <div className="mt-12">
           <h3 className="font-bold mb-4">Recent Recipients</h3>
           <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar">
-            {['Ahmed', 'Sara', 'Zain', 'Fatima', 'Bilal', 'JazzCash'].map((name, i) => (
+            {['Ahmed', 'Sara', 'Zain', 'Fatima', 'Bilal', 'JazzCash'].map((name) => (
               <button 
-                key={i} 
+                key={name} 
                 onClick={() => setRecipient(name)}
                 className="flex flex-col items-center gap-2"
               >
@@ -5199,7 +5219,7 @@ export default function App() {
   };
 
   const TransactionsScreen = () => {
-    const categories = ['All', ...new Set(transactions.map(t => t.category))];
+    const categories = ['All', ...new Set(transactions.map(t => t.category).filter(c => c !== 'All'))];
     
     const filteredTransactions = transactions.filter(tx => {
       const matchesSearch = tx.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -5410,9 +5430,9 @@ export default function App() {
                 <div>
                   <h3 className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-[0.2em] mb-4 ml-2">App Features</h3>
                   <div className="grid grid-cols-2 gap-3">
-                    {filteredFeatures.map((feature, i) => (
+                    {filteredFeatures.map((feature) => (
                       <button 
-                        key={i}
+                        key={feature.name}
                         onClick={() => { navigateTo(feature.screen as any); setSearchQuery(''); }}
                         className="glass-card p-4 flex items-center gap-3 bg-white/5 border border-white/5 hover:bg-white/10 active:scale-95 transition-all"
                       >
@@ -5434,9 +5454,9 @@ export default function App() {
                 <div>
                   <h3 className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-[0.2em] mb-4 ml-2">Contacts</h3>
                   <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar">
-                    {filteredContacts.map((name, i) => (
+                    {filteredContacts.map((name) => (
                       <button 
-                        key={i}
+                        key={name}
                         onClick={() => { navigateTo('transfer'); setSearchQuery(''); }}
                         className="flex flex-col items-center gap-2 min-w-[70px]"
                       >
