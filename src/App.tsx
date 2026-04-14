@@ -2854,6 +2854,38 @@ export default function App() {
           </div>
         </div>
 
+        {/* Digital Wallets Section */}
+        <div className="mt-8">
+          <div className="px-6 flex justify-between items-center mb-4">
+            <h3 className="font-bold text-lg text-soft-mint/80">Digital Wallets</h3>
+            <button onClick={() => navigateTo('wallets')} className="text-light-green text-sm font-bold flex items-center gap-1">
+              <Plus size={16} /> Link New
+            </button>
+          </div>
+          <div className="flex gap-4 overflow-x-auto px-6 pb-4 hide-scrollbar snap-x">
+            {wallets.map((wallet, idx) => (
+              <motion.div 
+                key={wallet.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                onClick={() => navigateTo('wallets')}
+                className={`min-w-[160px] glass-card p-4 flex flex-col items-center gap-3 snap-center cursor-pointer active:scale-95 transition-all ${wallet.isLinked ? 'border-emerald-500/30' : 'opacity-50'}`}
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden bg-white/5 p-2`}>
+                  <img src={wallet.logo} alt={wallet.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                </div>
+                <div className="text-center">
+                  <p className="text-xs font-bold text-soft-mint">{wallet.name}</p>
+                  <p className="text-[10px] text-soft-mint/40 mt-1">
+                    {wallet.isLinked ? `Rs. ${wallet.balance.toLocaleString()}` : 'Not Linked'}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
         {/* Quick Actions */}
         <div className="mt-8 px-6">
           <h3 className="font-bold text-lg mb-4 text-soft-mint/80">Quick Actions</h3>
@@ -2866,6 +2898,7 @@ export default function App() {
               { icon: Repeat, label: 'Jars', color: 'bg-indigo-500', action: () => navigateTo('jars') },
               { icon: MessageSquare, label: 'Social', color: 'bg-pink-500', action: () => navigateTo('social') },
               { icon: Calculator, label: 'Islamic', color: 'bg-yellow-600', action: () => navigateTo('islamic_hub') },
+              { icon: Wallet, label: 'Wallets', color: 'bg-emerald-500', action: () => navigateTo('wallets') },
               { icon: Bot, label: 'AI Chat', color: 'bg-indigo-500', action: () => navigateTo('chat') },
               { icon: Mic, label: 'Voice', color: 'bg-emerald-600', action: () => navigateTo('voice_banking') },
               { icon: MapPin, label: 'Offers', color: 'bg-rose-500', action: () => navigateTo('offers') },
