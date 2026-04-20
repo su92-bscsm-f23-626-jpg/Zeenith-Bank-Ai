@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
+import { jwtDecode } from 'jwt-decode';
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -87,7 +88,8 @@ import {
   onAuthStateChanged, 
   User as FirebaseUser,
   signInWithPopup,
-  signInWithCustomToken,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   GoogleAuthProvider
 } from 'firebase/auth';
 import { 
@@ -464,6 +466,7 @@ const Dialog = ({ title, children, onClose }: { title: string, children: React.R
 
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [sessionUser, setSessionUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [screen, setScreen] = useState<Screen>('splash');
@@ -519,38 +522,49 @@ export default function App() {
   const [otpValue, setOtpValue] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
   const [inputAmount, setInputAmount] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Derived user identity
+  const currentUserId = user?.email || sessionUser?.email;
+  const userPath = currentUserId ? `users/${currentUserId}` : null;
 
   // --- Effects ---
+
+  // Session recovery from JWT
+  useEffect(() => {
+    const token = localStorage.getItem('zenith_token');
+    if (token) {
+      try {
+        const decoded: any = jwtDecode(token);
+        setSessionUser({ email: decoded.email, fullName: decoded.fullName });
+      } catch (e) {
+        localStorage.removeItem('zenith_token');
+      }
+    }
+  }, [screen]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setIsAuthReady(true);
-      if (user) {
+      
+      const sessionEmail = user?.email || sessionUser?.email;
+      if (sessionEmail) {
         // Initialize user document if it doesn't exist
-        const userRef = doc(db, 'users', user.uid);
+        const userRef = doc(db, 'users', sessionEmail);
         
         // Real-time profile sync
         const unsubProfile = onSnapshot(userRef, (docSnap) => {
           if (docSnap.exists()) {
             setUserProfile(docSnap.data());
-          } else {
-            // Initialize if missing
-            setDoc(userRef, {
-              uid: user.uid,
-              displayName: user.displayName,
-              email: user.email,
-              photoURL: user.photoURL,
-              role: 'user',
-              createdAt: Timestamp.now()
-            }).catch(e => handleFirestoreError(e, OperationType.CREATE, 'users'));
           }
-        }, (err) => handleFirestoreError(err, OperationType.GET, `users/${user.uid}`));
+        }, (err) => handleFirestoreError(err, OperationType.GET, `users/${sessionEmail}`));
 
         // Real-time loans sync
-        const unsubLoans = onSnapshot(collection(db, `users/${user.uid}/loans`), (snapshot) => {
+        const unsubLoans = onSnapshot(collection(db, `users/${sessionEmail}/loans`), (snapshot) => {
           const loansData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan));
           setLoans(loansData);
-        }, (err) => handleFirestoreError(err, OperationType.GET, `users/${user.uid}/loans`));
+        }, (err) => handleFirestoreError(err, OperationType.GET, `users/${sessionEmail}/loans`));
 
         return () => {
           unsubProfile();
@@ -562,7 +576,7 @@ export default function App() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [sessionUser]);
 
   // Test Connection
   useEffect(() => {
@@ -580,9 +594,7 @@ export default function App() {
   // Data Fetching & Sync
   useEffect(() => {
     // In demo mode, we use initial data if user is not logged in or data is empty
-    const userPath = user ? `users/${user.uid}` : 'demo';
-
-    if (!user) {
+    if (!userPath) {
       setTransactions(INITIAL_TRANSACTIONS);
       setCards(INITIAL_CARDS);
       setWallets(INITIAL_WALLETS);
@@ -652,13 +664,6 @@ export default function App() {
     };
 
     syncInitialData();
-
-    // User Profile
-    const unsubProfile = onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
-      if (snapshot.exists()) {
-        setUserProfile(snapshot.data());
-      }
-    }, (e) => handleFirestoreError(e, OperationType.GET, `users/${user.uid}`));
 
     // Transactions
     const qTransactions = query(collection(db, userPath, 'transactions'), orderBy('timestamp', 'desc'), limit(50));
@@ -751,9 +756,16 @@ export default function App() {
         timestamp: doc.data().timestamp instanceof Timestamp ? doc.data().timestamp.toDate() : new Date(doc.data().timestamp)
       } as Message));
       setMessages(fetchedMsgs.length > 0 ? fetchedMsgs : [
-        { id: '1', text: `Assalamualaikm ${user.displayName || 'Manan'}! I'm your Zenith Bank AI Assistant. How can I help you today?`, sender: 'ai', timestamp: new Date() }
+        { id: '1', text: `Assalamualaikm ${userProfile?.fullName || sessionUser?.fullName || user?.displayName || 'Manan Ahmad'}! I'm your Zenith Bank AI Assistant. How can I help you today?`, sender: 'ai', timestamp: new Date() }
       ]);
     }, (e) => handleFirestoreError(e, OperationType.LIST, `${userPath}/messages`));
+    
+    // User Profile
+    const unsubProfile = onSnapshot(doc(db, 'users', currentUserId), (snapshot) => {
+      if (snapshot.exists()) {
+        setUserProfile(snapshot.data());
+      }
+    }, (e) => handleFirestoreError(e, OperationType.GET, `users/${currentUserId}`));
 
     return () => {
       unsubTransactions();
@@ -769,7 +781,7 @@ export default function App() {
       unsubMessages();
       unsubProfile();
     };
-  }, [user, isAuthReady]);
+  }, [user, currentUserId, userPath, isAuthReady]);
 
   useEffect(() => {
     if (screen === 'splash') {
@@ -806,8 +818,9 @@ export default function App() {
       showToast('Please enter email and password', 'error');
       return;
     }
+    setLoading(true);
     try {
-      // For demo: try real login, if fails or user not found, force login
+      // 1. Authenticate with Backend for JWT and profile sync
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -815,19 +828,19 @@ export default function App() {
       });
       const data = await response.json();
       
-      if (response.ok && data.customToken) {
-        await signInWithCustomToken(auth, data.customToken);
+      if (response.ok) {
+        // Store JWT
+        if (data.token) localStorage.setItem('zenith_token', data.token);
         setScreen('dashboard');
         showToast('Welcome back to Zenith!', 'success');
       } else {
-        // Force demo login for ANY email/password if API fails
-        setScreen('dashboard');
-        showToast('Demo Mode: Logged in with ' + loginEmail, 'success');
+        showToast(data.error || 'Login failed', 'error');
       }
-    } catch (error) {
-      // Fallback for network errors
-      setScreen('dashboard');
-      showToast('Demo Mode: Logged in (Offline)', 'success');
+    } catch (error: any) {
+      console.error("Login Error:", error);
+      showToast('Login connection failed. Please try again.', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -861,6 +874,7 @@ export default function App() {
       showToast('Invalid CNIC format (XXXXX-XXXXXXX-X)', 'error');
       return;
     }
+    setLoading(true);
     try {
       const response = await fetch('/api/otp/generate', {
         method: 'POST',
@@ -877,13 +891,16 @@ export default function App() {
       }
     } catch (error) {
       showToast('Signup failed', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleVerifyOtp = async () => {
-    // For demo purposes, allow any 6-digit code or the generated one
     if (otpValue.length === 6) {
+      setLoading(true);
       try {
+        // 1. Create records via backend (backend uses standard crypto for passwords)
         const response = await fetch('/api/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -897,12 +914,12 @@ export default function App() {
             password: loginPassword
           }),
         });
+        
         const data = await response.json();
         if (response.ok) {
-          // Authenticate with Firebase using custom token
-          if (data.customToken) {
-            await signInWithCustomToken(auth, data.customToken);
-          }
+          // Store JWT returned by signup if any
+          if (data.token) localStorage.setItem('zenith_token', data.token);
+          
           setScreen('dashboard');
           showToast('Account created successfully!', 'success');
           // Clear states
@@ -916,10 +933,13 @@ export default function App() {
           setLoginPassword('');
           setOtpValue('');
         } else {
-          showToast(data.error || 'Signup failed', 'error');
+          showToast(data.error || 'Registration failed', 'error');
         }
-      } catch (error) {
-        showToast('Signup failed', 'error');
+      } catch (error: any) {
+        console.error("Verification Error:", error);
+        showToast('Registration failed. Connection issue.', 'error');
+      } finally {
+        setLoading(false);
       }
     } else {
       showToast('Invalid OTP', 'error');
@@ -928,6 +948,9 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      localStorage.removeItem('zenith_token');
+      setSessionUser(null);
+      setUserProfile(null);
       await auth.signOut();
       setScreen('login');
       showToast('Logged out successfully');
@@ -956,7 +979,7 @@ export default function App() {
       icon: 'Send'
     };
 
-    if (!user) {
+    if (!userPath) {
       // Demo Mode
       setTransactions(prev => [newTx, ...prev]);
       if (cards.length > 0) {
@@ -968,7 +991,6 @@ export default function App() {
       return;
     }
 
-    const userPath = `users/${user.uid}`;
     try {
       const txData = {
         ...newTx,
@@ -1088,7 +1110,7 @@ export default function App() {
       icon: 'Receipt'
     };
 
-    if (!user) {
+    if (!userPath) {
       // Demo Mode
       setTransactions(prev => [newTx, ...prev]);
       if (cards.length > 0) {
@@ -1100,7 +1122,6 @@ export default function App() {
       return;
     }
 
-    const userPath = `users/${user.uid}`;
     try {
       const txData = {
         ...newTx,
@@ -1737,7 +1758,7 @@ export default function App() {
         model: "gemini-3-flash-preview",
         contents: history,
         config: {
-          systemInstruction: `You are Zenith AI, a helpful and intelligent banking assistant for Zenith Bank Pakistan. You help users with balance inquiries, spending analysis, financial advice, and navigating the app. Be polite, professional, and concise. Use Pakistani Rupee (Rs.) as the currency. The user's name is ${user?.displayName || 'Manan Ahmad'}. Their total balance is Rs. ${cards.reduce((acc, c) => acc + c.balance, 0).toLocaleString()}. They have savings jars, a multi-currency wallet, and an Islamic hub for Zakat and Sadaqah. Recent transactions: ${transactions.slice(0, 5).map(t => `${t.title}: Rs. ${t.amount}`).join(', ')}.`
+          systemInstruction: `You are Zenith AI, a helpful and intelligent banking assistant for Zenith Bank Pakistan. You help users with balance inquiries, spending analysis, financial advice, and navigating the app. Be polite, professional, and concise. Use Pakistani Rupee (Rs.) as the currency. The user's name is ${userProfile?.fullName || sessionUser?.fullName || user?.displayName || 'Manan Ahmad'}. Their total balance is Rs. ${cards.reduce((acc, c) => acc + c.balance, 0).toLocaleString()}. They have savings jars, a multi-currency wallet, and an Islamic hub for Zakat and Sadaqah. Recent transactions: ${transactions.slice(0, 5).map(t => `${t.title}: Rs. ${t.amount}`).join(', ')}.`
         }
       });
 
@@ -1894,9 +1915,10 @@ export default function App() {
             </div>
             <button 
               onClick={handleVerifyOtp}
-              className="w-full bg-forest-green text-soft-mint py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-transform"
+              disabled={loading}
+              className="w-full bg-forest-green text-soft-mint py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2"
             >
-              Verify & Continue
+              {loading ? <div className="w-5 h-5 border-2 border-soft-mint/30 border-t-soft-mint rounded-full animate-spin" /> : 'Verify & Continue'}
             </button>
             <button 
               onClick={() => setScreen('dashboard')}
@@ -2015,10 +2037,17 @@ export default function App() {
 
             <button 
               onClick={authMode === 'login' ? handleLogin : handleSignupInitiate}
+              disabled={loading}
               className="w-full bg-forest-green text-soft-mint py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-transform mt-4 flex items-center justify-center gap-2"
             >
-              {authMode === 'login' ? 'Login' : 'Create Account'}
-              <ArrowRight size={20} />
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-soft-mint/30 border-t-soft-mint rounded-full animate-spin" />
+              ) : (
+                <>
+                  {authMode === 'login' ? 'Login' : 'Create Account'}
+                  <ArrowRight size={20} />
+                </>
+              )}
             </button>
 
             <div className="flex items-center gap-4 my-4">
@@ -2633,12 +2662,12 @@ export default function App() {
               {user?.photoURL ? (
                 <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
-                user?.displayName?.split(' ').map(n => n[0]).join('') || 'MA'
+                (userProfile?.fullName || sessionUser?.fullName || user?.displayName || 'Manan Ahmad').split(' ').map((n: any) => n[0]).join('').toUpperCase().slice(0, 2) || 'MA'
               )}
             </div>
             <div>
               <p className="text-soft-mint/40 text-[10px] uppercase tracking-widest font-bold">Zenith Member</p>
-              <h2 className="text-lg font-bold text-soft-mint">{user?.displayName || 'Manan Ahmad'}</h2>
+              <h2 className="text-lg font-bold text-soft-mint">{userProfile?.fullName || sessionUser?.fullName || user?.displayName || 'Manan Ahmad'}</h2>
             </div>
           </div>
           <div className="flex gap-3">
@@ -4619,14 +4648,14 @@ export default function App() {
               {user?.photoURL ? (
                 <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
-                user?.displayName?.split(' ').map(n => n[0]).join('') || 'MA'
+                (userProfile?.fullName || sessionUser?.fullName || user?.displayName || 'Manan Ahmad').split(' ').map((n: any) => n[0]).join('').toUpperCase().slice(0, 2) || 'MA'
               )}
             </div>
             <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-emerald-500 rounded-2xl flex items-center justify-center border-4 border-deep-forest-1 z-20 shadow-lg">
               <Camera size={18} className="text-white" />
             </div>
           </div>
-          <h2 className="text-2xl font-bold text-soft-mint mt-6">{user?.displayName || 'Manan Ahmad'}</h2>
+          <h2 className="text-2xl font-bold text-soft-mint mt-6">{userProfile?.fullName || sessionUser?.fullName || user?.displayName || 'Manan Ahmad'}</h2>
           <p className="text-soft-mint/60 text-sm font-medium mt-1">{user?.email || 'Premium Zenith Member • Since 2024'}</p>
           
           <div className="flex gap-4 mt-8">
@@ -4650,11 +4679,11 @@ export default function App() {
                 <div className="space-y-4">
                   <div className="bg-white/5 p-4 rounded-2xl">
                     <p className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-widest">Full Name</p>
-                    <input id="editName" defaultValue={user?.displayName || ''} className="bg-transparent border-none text-soft-mint font-bold w-full focus:outline-none" />
+                    <input id="editName" defaultValue={userProfile?.fullName || sessionUser?.fullName || user?.displayName || 'Manan Ahmad'} className="bg-transparent border-none text-soft-mint font-bold w-full focus:outline-none" />
                   </div>
                   <div className="bg-white/5 p-4 rounded-2xl">
                     <p className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-widest">Email Address</p>
-                    <input id="editEmail" defaultValue={user?.email || ''} className="bg-transparent border-none text-soft-mint font-bold w-full focus:outline-none" />
+                    <p className="text-soft-mint font-bold">{user?.email || sessionUser?.email || 'ahmadgaming139@gmail.com'}</p>
                   </div>
                   <div className="bg-white/5 p-4 rounded-2xl">
                     <p className="text-[10px] font-bold text-soft-mint/40 uppercase tracking-widest">Phone Number</p>

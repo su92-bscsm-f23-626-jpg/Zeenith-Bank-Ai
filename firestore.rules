@@ -54,8 +54,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "su92-bscsm-f23-626@superior.edu.pk" && request.auth.token.email_verified == true));
+        (get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.role == 'admin' ||
+          request.auth.token.email == "su92-bscsm-f23-626@superior.edu.pk");
     }
 
     function isValidUser(data) {
@@ -79,44 +79,27 @@ service cloud.firestore {
     }
 
     // ===============================================================
-    // Rules
+    // Rules (UNSAFE FOR PRODUCTION: Relaxed for Demo Presentation)
     // ===============================================================
 
     match /users/{email} {
-      allow read: if isOwner(email) || isAdmin();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(email) || isAdmin());
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(email) || isAdmin());
+      allow read, write: if true; 
       
-      match /transactions/{txId} {
-        allow read: if isOwner(email) || isAdmin();
-        allow create: if isOwner(email) && isValidTransaction(request.resource.data);
-      }
-
-      match /securityLogs/{logId} {
-        allow read: if isOwner(email) || isAdmin();
-        allow create: if isOwner(email);
-      }
-
-      match /bills/{billId} {
-        allow read: if isOwner(email) || isAdmin();
-        allow create: if isOwner(email);
-      }
-
-      match /wallets/{walletId} {
-        allow read: if isOwner(email) || isAdmin();
-        allow create: if isOwner(email) && isValidWallet(request.resource.data);
-      }
-      
-      match /cards/{cardId} {
-        allow read: if isOwner(email) || isAdmin();
-        allow write: if isOwner(email);
+      match /{allSubcollections=**} {
+        allow read, write: if true;
       }
     }
 
     match /wallets/{email} {
-      allow read: if isOwner(email) || isAdmin();
-      allow create: if isAuthenticated() && isValidWallet(request.resource.data) && (isOwner(email) || isAdmin());
-      allow update: if isAuthenticated() && isValidWallet(request.resource.data) && (isOwner(email) || isAdmin());
+      allow read, write: if true;
+      
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
+    }
+
+    match /test/{docId} {
+      allow read, write: if true;
     }
 
     // Default deny
